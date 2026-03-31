@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GPS Route Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f5;
+      color: #222;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 18px; font-weight: 600; }
+
+    /* ── Controls bar ────────────────────────────────────── */
+    #controls {
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    label { font-size: 13px; color: #555; }
+
+    select {
+      font-size: 13px;
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      min-width: 180px;
+    }
+
+    button {
+      font-size: 13px;
+      padding: 7px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    #btn-show   { background: #1a73e8; color: #fff; }
+    #btn-show:hover { background: #1558b0; }
+    #btn-animate { background: #34a853; color: #fff; }
+    #btn-animate:hover { background: #2a8a43; }
+    #btn-animate:disabled { background: #ccc; cursor: default; }
+    #btn-clear  { background: #f1f1f1; color: #333; }
+    #btn-clear:hover { background: #e0e0e0; }
+
+    /* ── Main layout: stats panel + map ─────────────────── */
+    #main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Stats sidebar ───────────────────────────────────── */
+    #sidebar {
+      width: 240px;
+      background: #fff;
+      border-right: 1px solid #e0e0e0;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    #sidebar h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-card {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 22px;
+      font-weight: 600;
+      color: #1a1a2e;
+    }
+    .stat-unit {
+      font-size: 12px;
+      color: #888;
+      margin-left: 2px;
+    }
+
+    #waypoint-list {
+      font-size: 12px;
+      color: #444;
+      line-height: 1.8;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+    .wp-item {
+      padding: 4px 0;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+    }
+    .wp-item:last-child { border-bottom: none; }
+    .wp-time { color: #888; font-size: 11px; }
+    .wp-coords { font-family: monospace; }
+
+    #status {
+      font-size: 12px;
+      color: #888;
+      font-style: italic;
+      margin-top: auto;
+    }
+
+    /* ── Map ─────────────────────────────────────────────── */
+    #map {
+      flex: 1;
+      height: 100%;
+    }
+
+    /* ── Marker pulse animation ──────────────────────────── */
+    @keyframes pulse {
+      0%   { transform: scale(1);   opacity: 1; }
+      50%  { transform: scale(1.3); opacity: 0.7; }
+      100% { transform: scale(1);   opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>GPS Route Tracker</h1>
+  <span style="font-size:13px; color:#aaa;">CST8276 Group 2 — Oracle 26ai Demo</span>
+</header>
+
+<div id="controls">
+  <label for="user-select">User</label>
+  <select id="user-select">
+    <option value="">— select user —</option>
+  </select>
+
+  <label for="session-select">Session</label>
+  <select id="session-select" disabled>
+    <option value="">— select session —</option>
+  </select>
+
+  <button id="btn-show">Show Route</button>
+  <button id="btn-animate" disabled>Animate Route</button>
+  <button id="btn-clear">Clear</button>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <h2>Route Summary</h2>
+
+    <div class="stat-card">
+      <div class="stat-label">Distance</div>
+      <div class="stat-value" id="stat-distance">—
+        <span class="stat-unit">km</span>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Duration</div>
+      <div class="stat-value" id="stat-duration">—
+        <span class="stat-unit">min</span>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Waypoints</div>
+      <div class="stat-value" id="stat-waypoints">—</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Session</div>
+      <div style="font-size:13px; color:#333; margin-top:4px;" id="stat-label">—</div>
+      <div style="font-size:11px; color:#888; margin-top:2px;" id="stat-time">—</div>
+    </div>
+
+    <h2>Waypoints</h2>
+    <div id="waypoint-list">Select a session to view waypoints.</div>
+
+    <div id="status">Ready.</div>
+  </div>
+
+  <div id="map"></div>
+</div>
+
+<script>
+// ============================================================
+// App State
+// ============================================================
+let map, polyline, startMarker, endMarker, animMarker;
+let currentWaypoints = [];
+let animInterval = null;
+
+// ============================================================
+// Initialise Google Maps
+// ============================================================
+function initMap() {
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: { lat: 45.4035, lng: -75.6872 },   // Ottawa centre
+    zoom: 13,
+    mapTypeId: "roadmap"
+  });
+  loadUsers();
+}
+
+// ============================================================
+// Load users into the dropdown
+// ============================================================
+async function loadUsers() {
+  const res = await fetch("/api/users");
+  const users = await res.json();
+  const sel = document.getElementById("user-select");
+  users.forEach(u => {
+    const opt = document.createElement("option");
+    opt.value = u.user_id;
+    opt.textContent = u.username;
+    sel.appendChild(opt);
+  });
+}
+
+// ============================================================
+// When a user is selected → load their sessions
+// ============================================================
+document.getElementById("user-select").addEventListener("change", async function () {
+  const sessionSel = document.getElementById("session-select");
+  sessionSel.innerHTML = '<option value="">— select session —</option>';
+  sessionSel.disabled = true;
+  document.getElementById("btn-show").disabled = false;
+
+  if (!this.value) return;
+
+  const res = await fetch(`/api/sessions?user_id=${this.value}`);
+  const sessions = await res.json();
+
+  sessions.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.session_id;
+    opt.textContent = `${s.label} (${s.started.slice(0, 10)})`;
+    sessionSel.appendChild(opt);
+  });
+  sessionSel.disabled = false;
+});
+
+// ============================================================
+// Show Route button
+// ============================================================
+document.getElementById("btn-show").addEventListener("click", async () => {
+  const sessionId = document.getElementById("session-select").value;
+  if (!sessionId) { alert("Please select a session first."); return; }
+
+  setStatus("Loading waypoints…");
+  clearMap();
+
+  // Fetch waypoints and summary in parallel
+  const [wpRes, sumRes] = await Promise.all([
+    fetch(`/api/waypoints?session_id=${sessionId}`),
+    fetch(`/api/summary?session_id=${sessionId}`)
+  ]);
+
+  currentWaypoints = await wpRes.json();
+  const summary    = await sumRes.json();
+
+  if (currentWaypoints.length === 0) {
+    setStatus("No waypoints found.");
+    return;
+  }
+
+  drawRoute(currentWaypoints);
+  updateStats(summary);
+  updateWaypointList(currentWaypoints);
+  document.getElementById("btn-animate").disabled = false;
+  setStatus(`Showing ${currentWaypoints.length} waypoints.`);
+});
+
+// ============================================================
+// Draw the route polyline + start/end markers
+// ============================================================
+function drawRoute(waypoints) {
+  const path = waypoints.map(w => ({ lat: w.lat, lng: w.lng }));
+
+  polyline = new google.maps.Polyline({
+    path,
+    geodesic: true,
+    strokeColor: "#1a73e8",
+    strokeOpacity: 0.9,
+    strokeWeight: 4,
+    map
+  });
+
+  // Green start marker
+  startMarker = new google.maps.Marker({
+    position: path[0],
+    map,
+    title: "Start",
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 10,
+      fillColor: "#34a853",
+      fillOpacity: 1,
+      strokeColor: "#fff",
+      strokeWeight: 2
+    }
+  });
+
+  // Red end marker
+  endMarker = new google.maps.Marker({
+    position: path[path.length - 1],
+    map,
+    title: "End",
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 10,
+      fillColor: "#ea4335",
+      fillOpacity: 1,
+      strokeColor: "#fff",
+      strokeWeight: 2
+    }
+  });
+
+  // Fit map to the route
+  const bounds = new google.maps.LatLngBounds();
+  path.forEach(p => bounds.extend(p));
+  map.fitBounds(bounds);
+}
+
+// ============================================================
+// Animate button — moves a marker along the route
+// ============================================================
+document.getElementById("btn-animate").addEventListener("click", () => {
+  if (currentWaypoints.length === 0) return;
+
+  // Stop any existing animation
+  if (animInterval) {
+    clearInterval(animInterval);
+    animInterval = null;
+    if (animMarker) { animMarker.setMap(null); animMarker = null; }
+    document.getElementById("btn-animate").textContent = "Animate Route";
+    setStatus(`Showing ${currentWaypoints.length} waypoints.`);
+    return;
+  }
+
+  document.getElementById("btn-animate").textContent = "Stop Animation";
+
+  animMarker = new google.maps.Marker({
+    position: { lat: currentWaypoints[0].lat, lng: currentWaypoints[0].lng },
+    map,
+    title: "Moving",
+    icon: {
+      path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+      scale: 5,
+      fillColor: "#fbbc04",
+      fillOpacity: 1,
+      strokeColor: "#333",
+      strokeWeight: 1
+    }
+  });
+
+  let i = 0;
+  animInterval = setInterval(() => {
+    if (i >= currentWaypoints.length) {
+      clearInterval(animInterval);
+      animInterval = null;
+      document.getElementById("btn-animate").textContent = "Animate Route";
+      setStatus("Animation complete.");
+      return;
+    }
+    const wp = currentWaypoints[i];
+    animMarker.setPosition({ lat: wp.lat, lng: wp.lng });
+    setStatus(`Point ${i + 1}/${currentWaypoints.length} — ${wp.recorded_at}`);
+    i++;
+  }, 400);   // 400ms per waypoint — adjust speed here
+});
+
+// ============================================================
+// Clear button
+// ============================================================
+document.getElementById("btn-clear").addEventListener("click", () => {
+  clearMap();
+  resetStats();
+  document.getElementById("waypoint-list").textContent = "Select a session to view waypoints.";
+  document.getElementById("btn-animate").disabled = true;
+  setStatus("Ready.");
+});
+
+function clearMap() {
+  if (polyline)    { polyline.setMap(null);    polyline = null; }
+  if (startMarker) { startMarker.setMap(null); startMarker = null; }
+  if (endMarker)   { endMarker.setMap(null);   endMarker = null; }
+  if (animMarker)  { animMarker.setMap(null);  animMarker = null; }
+  if (animInterval){ clearInterval(animInterval); animInterval = null; }
+  document.getElementById("btn-animate").textContent = "Animate Route";
+  currentWaypoints = [];
+}
+
+// ============================================================
+// Stats panel helpers
+// ============================================================
+function updateStats(summary) {
+  document.getElementById("stat-distance").innerHTML =
+    `${summary.distance_km.toFixed(2)} <span class="stat-unit">km</span>`;
+  document.getElementById("stat-duration").innerHTML =
+    `${summary.duration_min.toFixed(0)} <span class="stat-unit">min</span>`;
+  document.getElementById("stat-waypoints").textContent = summary.waypoint_count;
+  document.getElementById("stat-label").textContent = summary.label;
+  document.getElementById("stat-time").textContent =
+    `${summary.started} → ${summary.ended}`;
+}
+
+function resetStats() {
+  ["stat-distance","stat-duration","stat-waypoints"].forEach(id => {
+    document.getElementById(id).textContent = "—";
+  });
+  document.getElementById("stat-label").textContent = "—";
+  document.getElementById("stat-time").textContent = "—";
+}
+
+function updateWaypointList(waypoints) {
+  const list = document.getElementById("waypoint-list");
+  list.innerHTML = "";
+  waypoints.forEach((wp, i) => {
+    const div = document.createElement("div");
+    div.className = "wp-item";
+    div.innerHTML = `
+      <span class="wp-coords">${wp.lat.toFixed(4)}, ${wp.lng.toFixed(4)}</span>
+      <span class="wp-time">${wp.recorded_at.slice(11)}</span>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function setStatus(msg) {
+  document.getElementById("status").textContent = msg;
+}
+</script>
+
+<!--
+  GOOGLE_MAPS_API_KEY 
+  Get one free at: https://console.cloud.google.com/
+  Enable "Maps JavaScript API" in the API Library.
+-->
+<script
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDM_8q5S2Ui6pymvJn8Nw7ZQMNMuvi7Gus&callback=initMap"
+  async defer>
+</script>
+
+</body>
+</html>
