@@ -31,6 +31,7 @@ sqlplus gpsuser/gpspassword123@localhost:1521/FREEPDB1
 Then run:
 ```sql
 @seed_data.sql
+@seed_data_extra.sql
 ```
 
 ### 4. Add your Google Maps API key
