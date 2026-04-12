@@ -31,6 +31,7 @@ sqlplus gpsuser/gpspassword123@localhost:1521/FREEPDB1
 Then run:
 ```sql
 @seed_data.sql
+@seed_data_extra.sql
 ```
 
 ### 4. Add your Google Maps API key
@@ -61,6 +62,7 @@ gps-route-tracker/
 ├── app.py              Flask backend
 ├── schema.sql          Oracle DDL (4 tables + index)
 ├── seed_data.sql       Sample Ottawa GPS routes
+├── seed_data_extra.sql Extra sample Ottawa GPS routes
 ├── requirements.txt    Python dependencies
 ├── static/
 │   └── index.html      Frontend + Google Maps
