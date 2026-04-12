@@ -8,7 +8,7 @@ The application stores real GPS waypoints in a relational Oracle database, retri
 
 ## Live Demo
 
-![GPS Route Tracker Demo](static/DemoShot.png)
+![GPS Route Tracker Demo](Static/DemoShot.png)
 
 Select a user → select a session → click **Show Route** to draw the route on the map. Hit **Animate Route** to replay the trip waypoint by waypoint with timestamp updates in the sidebar.
 
